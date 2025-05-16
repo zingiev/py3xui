@@ -172,3 +172,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+# my ignores
+tests.py
+
+# cookies file
+session.json
