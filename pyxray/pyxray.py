@@ -142,7 +142,7 @@ class Client:
             "allocate": dumps(allocate)
         }
         path = f'{self.base_url}/add'
-        return self._request("POST", path, json=payload)
+        return self._request("POST", path, data=payload)
 
     def add_user_to_inbound(
         self,
@@ -168,4 +168,4 @@ class Client:
             "settings": dumps(client_settings)
         }
         path = f'{self.base_url}/addClient'
-        return self._request("POST", path, json=payload)
+        return self._request("POST", path, data=payload)
