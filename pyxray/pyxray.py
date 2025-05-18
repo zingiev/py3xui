@@ -81,32 +81,27 @@ class Client:
                 path=c["path"]
             )
 
-    def get_inbounds_request(self, url: str):
-        headers = {"Accept": "application/json"}
-        response = self.session.get(url, headers=headers)
+    def _request(self, method: str, path: str, **kwargs):
+        url = self._build_url(path)
+        headers = kwargs.pop("headers", {"Accept": "application/json"})
+        response = self.session.request(method, url, headers=headers, **kwargs)
+
         if response.status_code == HTTPStatus.OK:
             self._store_cookies()
             return response.json()
         raise Exception(response.reason, response.status_code)
 
     def inbounds(self) -> dict:
-        url = self._build_url(f"{self.base_url}/list")
-        response = self.get_inbounds_request(url)
-        return response
+        path = f"{self.base_url}/list"
+        return self._request("GET", path)
 
     def inbound(self, inbound_id: str) -> dict:
-        url = self._build_url(f"{self.base_url}/get/{inbound_id}")
-        response = self.get_inbounds_request(url)
-        return response
+        path = f"{self.base_url}/get/{inbound_id}"
+        return self._request("GET", path)
 
     def get_traffics_with_email(self, email: str) -> dict:
-        url = self._build_url(f"{self.base_url}/getClientTraffics/{email}")
-        headers = {"Accept": "application/json"}
-        response = self.session.get(url, headers=headers)
-        if response.status_code == HTTPStatus.OK:
-            self._store_cookies()
-            return response.json()
-        raise Exception(response.reason, response.status_code)
+        path = f"{self.base_url}/getClientTraffics/{email}"
+        return self._request("GET", path)
 
     def add_inbound(
         self,
@@ -123,9 +118,6 @@ class Client:
 
         if port is None:
             port = randint(12345, 54321)
-
-        url = self._build_url(f"{self.base_url}/add/")
-        headers = {"Accept": "application/json"}
 
         client_settings = generate_client_settings()
         stream_settings = generate_stream_settings()
@@ -149,11 +141,8 @@ class Client:
             "sniffing": dumps(sniffing),
             "allocate": dumps(allocate)
         }
-        response = self.session.post(url, headers=headers, data=payload)
-        if response.status_code == HTTPStatus.OK:
-            self._store_cookies()
-            return response.json()
-        raise Exception(response.reason, response.status_code)
+        path = f'{self.base_url}/add'
+        return self._request("POST", path, json=payload)
 
     def add_user_to_inbound(
         self,
@@ -168,8 +157,6 @@ class Client:
             result = self.inbounds()
             inbound_id = result["obj"][-1]["id"]
 
-        url = self._build_url(f"{self.base_url}/addClient")
-
         client_settings = generate_client_settings(
             email=email, total_gb=total_gb, tg_id=tg_id,
             expiry_time=expiry_time, enable=enable)
@@ -180,9 +167,5 @@ class Client:
             "id": inbound_id,
             "settings": dumps(client_settings)
         }
-        headers = {"Accept": "application/json"}
-        response = self.session.post(url, headers=headers, data=payload)
-        if response.status_code == HTTPStatus.OK:
-            self._store_cookies()
-            return response.json()
-        raise Exception(response.reason, response.status_code)
+        path = f'{self.base_url}/addClient'
+        return self._request("POST", path, json=payload)
