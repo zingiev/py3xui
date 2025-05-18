@@ -1,8 +1,17 @@
-import random
-from string import ascii_lowercase, digits
+from json import dumps
+from random import randint
+from datetime import datetime, timedelta
 from http import HTTPStatus
+
+from pytz import timezone
 from requests import Session
 
+from .payload_data import (
+    generate_allocate,
+    generate_client_settings,
+    generate_stream_settings,
+    generate_sniffing
+)
 from .db import DB
 
 db = DB()
@@ -12,8 +21,8 @@ class Client:
     def __init__(self, host: str, port: int, web_base_path: str) -> None:
         self.host = host
         self.port = port
-        self.web_base_path = web_base_path.strip('/')
-        self.base_url = 'panel/api/inbounds'
+        self.web_base_path = web_base_path.strip("/")
+        self.base_url = "panel/api/inbounds"
         self.session = Session()
 
         if db.exists_data(self.host):
@@ -22,13 +31,13 @@ class Client:
             self._prompt_login()
 
     def _prompt_login(self) -> None:
-        username = input('Username: ')
-        password = input('Password: ')
+        username = input("Username: ")
+        password = input("Password: ")
         self._login_and_store_cookies(username, password)
 
     def _login_and_store_cookies(self, username: str, password: str) -> None:
-        url = self._build_url('login')
-        payload = {'username': username, 'password': password}
+        url = self._build_url("login")
+        payload = {"username": username, "password": password}
         response = self.session.post(url, data=payload)
 
         if response.status_code == HTTPStatus.OK:
@@ -37,20 +46,20 @@ class Client:
             raise Exception(response.reason, response.status_code)
 
     def _build_url(self, path: str) -> str:
-        return f'http://{self.host}:{self.port}/{self.web_base_path}/{path}'
+        return f"http://{self.host}:{self.port}/{self.web_base_path}/{path}"
 
     def _store_cookies(self) -> None:
         if not self.session.cookies:
             raise Exception(
-                'No cookies found. Possibly incorrect credentials.')
+                "No cookies found. Possibly incorrect credentials.")
 
         for cookie in self.session.cookies:
             cookie_data = {
-                'name': cookie.name,
-                'value': cookie.value,
-                'domain': cookie.domain,
-                'path': cookie.path,
-                'secure': str(cookie.secure)
+                "name": cookie.name,
+                "value": cookie.value,
+                "domain": cookie.domain,
+                "path": cookie.path,
+                "secure": str(cookie.secure)
             }
 
             if db.exists_cookie(cookie.domain, cookie.name):
@@ -66,14 +75,14 @@ class Client:
 
         for c in cookies:
             self.session.cookies.set(
-                name=c['name'],
-                value=c['value'],
-                domain=c['domain'],
-                path=c['path']
+                name=c["name"],
+                value=c["value"],
+                domain=c["domain"],
+                path=c["path"]
             )
 
     def get_inbounds_request(self, url: str):
-        headers = {'Accept': 'application/json'}
+        headers = {"Accept": "application/json"}
         response = self.session.get(url, headers=headers)
         if response.status_code == HTTPStatus.OK:
             self._store_cookies()
@@ -81,18 +90,18 @@ class Client:
         raise Exception(response.reason, response.status_code)
 
     def inbounds(self) -> dict:
-        url = self._build_url(f'{self.base_url}/list')
+        url = self._build_url(f"{self.base_url}/list")
         response = self.get_inbounds_request(url)
         return response
 
     def inbound(self, inbound_id: str) -> dict:
-        url = self._build_url(f'{self.base_url}/get/{inbound_id}')
+        url = self._build_url(f"{self.base_url}/get/{inbound_id}")
         response = self.get_inbounds_request(url)
         return response
 
     def get_traffics_with_email(self, email: str) -> dict:
-        url = self._build_url(f'{self.base_url}/getClientTraffics/{email}')
-        headers = {'Accept': 'application/json'}
+        url = self._build_url(f"{self.base_url}/getClientTraffics/{email}")
+        headers = {"Accept": "application/json"}
         response = self.session.get(url, headers=headers)
         if response.status_code == HTTPStatus.OK:
             self._store_cookies()
@@ -101,53 +110,79 @@ class Client:
 
     def add_inbound(
         self,
-        name_inbound: str = 'New',
+        name_inbound: str = "New",
         enable: bool = True,
         expiry_time: int = 0,
-        port: int = 55421,
-        protocol: str = 'vless'
+        port: int = None,
+        protocol: str = "vless"
     ):
-        url = self._build_url(f'{self.base_url}/add/')
-        headers = {'Accept': 'application/json'}
+        if expiry_time > 0:
+            current_date = datetime.now(timezone("Europe/Moscow"))
+            future_time = current_date + timedelta(days=expiry_time)
+            expiry_time = int(future_time.timestamp() * 1000)
+
+        if port is None:
+            port = randint(12345, 54321)
+
+        url = self._build_url(f"{self.base_url}/add/")
+        headers = {"Accept": "application/json"}
+
+        client_settings = generate_client_settings()
+        stream_settings = generate_stream_settings()
+        sniffing = generate_sniffing()
+        allocate = generate_allocate()
+
         payload = {
-            "success": 'true',
-            "msg": "Create Successfully",
-            "obj": {
-                "up": 0,
-                "down": 0,
-                "total": 0,
-                "remark": name_inbound,
-                "enable": enable,
-                "expiryTime": expiry_time,
-                "clientStats": 'null',
-                "listen": "",
-                "port": port,
-                "protocol": protocol,
-                "settings": "{\"clients\": [{\"id\": \"b86c0cdc-8a02-4da4-8693-72ba27005587\",\"flow\": \"\",\"email\": \"nt3wz904\",\"limitIp\": 0,\"totalGB\": 0,\"expiryTime\": 0,\"enable\": true,\"tgId\": \"\",\"subId\": \"rqv5zw1ydutamcp0\",\"reset\": 0}],\"decryption\": \"none\",\"fallbacks\": []}",
-                "streamSettings": "{\"network\": \"tcp\",\"security\": \"reality\",\"externalProxy\": [],\"realitySettings\": {\"show\": false,\"xver\": 0,\"dest\": \"yahoo.com:443\",\"serverNames\": [\"yahoo.com\",\"www.yahoo.com\"],\"privateKey\": \"wIc7zBUiTXBGxM7S7wl0nCZ663OAvzTDNqS7-bsxV3A\",\"minClient\": \"\",\"maxClient\": \"\",\"maxTimediff\": 0,\"shortIds\": [\"47595474\",\"7a5e30\",\"810c1efd750030e8\",\"99\",\"9c19c134b8\",\"35fd\",\"2409c639a707b4\",\"c98fc6b39f45\"],\"settings\": {\"publicKey\": \"2UqLjQFhlvLcY7VzaKRotIDQFOgAJe1dYD1njigp9wk\",\"fingerprint\": \"random\",\"serverName\": \"\",\"spiderX\": \"/\"}},\"tcpSettings\": {\"acceptProxyProtocol\": false,\"header\": {\"type\": \"none\"}}}",
-                "tag": "inbound-55421",
-                "sniffing": "{\"enabled\": true,\"destOverride\": [\"http\",\"tls\",\"quic\",\"fakedns\"],\"metadataOnly\": false,\"routeOnly\": false}",
-                "allocate": "{\"strategy\": \"always\",\"refresh\": 5,\"concurrency\": 3}"
-            }
+            "up": 0,
+            "down": 0,
+            "total": 0,
+            "remark": name_inbound,
+            "enable": enable,
+            "expiryTime": expiry_time,
+            "clientStats": "null",
+            "listen": "",
+            "port": port,
+            "protocol": protocol,
+            "settings": dumps(client_settings),
+            "streamSettings": dumps(stream_settings),
+            "tag": "inbound-55421",
+            "sniffing": dumps(sniffing),
+            "allocate": dumps(allocate)
         }
-        response = self.session.post(url, headers=headers, params=payload)
+        response = self.session.post(url, headers=headers, data=payload)
         if response.status_code == HTTPStatus.OK:
             self._store_cookies()
             return response.json()
         raise Exception(response.reason, response.status_code)
 
-# dd9ebef2-ce00-47fe-adc3-31d4a13343a5
+    def add_user_to_inbound(
+        self,
+        inbound_id: int = None,
+        email: str = None,
+        total_gb: int = 0,
+        expiry_time: int = 0,
+        enable: bool = True,
+        tg_id: str = ""
+    ):
+        if inbound_id is None:
+            result = self.inbounds()
+            inbound_id = result["obj"][-1]["id"]
 
-    def add_user_to_inbound(self, inbound_id: int, email: str = None):
-        if not email:
-            string = ascii_lowercase + digits
-            idx = []
-            gen_length = [8, 4, 4, 4, 12]
-            for i in gen_length:
-                idx.append([random.choice(string) for _ in range(i)])
-            idx = '-'.join([''.join(i) for i in idx])
-        url = self._build_url(f'{self.base_url}/addClient')
+        url = self._build_url(f"{self.base_url}/addClient")
+
+        client_settings = generate_client_settings(
+            email=email, total_gb=total_gb, tg_id=tg_id,
+            expiry_time=expiry_time, enable=enable)
+        client_settings.pop("decryption")
+        client_settings.pop("fallbacks")
+
         payload = {
-        "id": inbound_id,
-        "settings": "{\"clients\": [{\"id\": \"bbfad557-28f2-47e5-9f3d-e3c7f539fbda\",\"flow\": \"xtls-rprx-vision\",\"email\": \"dp1plm9lt8\",\"limitIp\": 0,\"totalGB\": 0,\"expiryTime\": 0,\"enable\": true,\"tgId\": \"\",\"subId\": \"2rv0gb458kbfl592\",\"reset\": 0}]}"
-    }
+            "id": inbound_id,
+            "settings": dumps(client_settings)
+        }
+        headers = {"Accept": "application/json"}
+        response = self.session.post(url, headers=headers, data=payload)
+        if response.status_code == HTTPStatus.OK:
+            self._store_cookies()
+            return response.json()
+        raise Exception(response.reason, response.status_code)
