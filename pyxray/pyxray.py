@@ -2,6 +2,7 @@ from json import dumps
 from random import randint
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from typing import Union
 
 from pytz import timezone
 from requests import Session
@@ -18,7 +19,7 @@ db = DB()
 
 
 class Client:
-    def __init__(self, host: str, port: int, web_base_path: str) -> None:
+    def __init__(self, host: str, port: int, web_base_path: str):
         self.host = host
         self.port = port
         self.web_base_path = web_base_path.strip("/")
@@ -30,12 +31,12 @@ class Client:
         else:
             self._prompt_login()
 
-    def _prompt_login(self) -> None:
+    def _prompt_login(self):
         username = input("Username: ")
         password = input("Password: ")
         self._login_and_store_cookies(username, password)
 
-    def _login_and_store_cookies(self, username: str, password: str) -> None:
+    def _login_and_store_cookies(self, username: str, password: str):
         url = self._build_url("login")
         payload = {"username": username, "password": password}
         response = self.session.post(url, data=payload)
@@ -45,10 +46,10 @@ class Client:
         else:
             raise Exception(response.reason, response.status_code)
 
-    def _build_url(self, path: str) -> str:
+    def _build_url(self, path: str):
         return f"http://{self.host}:{self.port}/{self.web_base_path}/{path}"
 
-    def _store_cookies(self) -> None:
+    def _store_cookies(self):
         if not self.session.cookies:
             raise Exception(
                 "No cookies found. Possibly incorrect credentials.")
@@ -67,7 +68,7 @@ class Client:
             else:
                 db.insert_data(**cookie_data)
 
-    def _load_cookies_from_db(self) -> None:
+    def _load_cookies_from_db(self):
         cookies = db.get_cookies_by_domain(self.host)
         if not cookies:
             raise Exception(
@@ -91,15 +92,15 @@ class Client:
             return response.json()
         raise Exception(response.reason, response.status_code)
 
-    def inbounds(self) -> dict:
+    def inbounds(self):
         path = f"{self.base_url}/list"
         return self._request("GET", path)
 
-    def inbound(self, inbound_id: str) -> dict:
+    def inbound(self, inbound_id: str):
         path = f"{self.base_url}/get/{inbound_id}"
         return self._request("GET", path)
 
-    def get_traffics_with_email(self, email: str) -> dict:
+    def get_traffics_with_email(self, email: str):
         path = f"{self.base_url}/getClientTraffics/{email}"
         return self._request("GET", path)
 
@@ -108,7 +109,7 @@ class Client:
         name_inbound: str = "New",
         enable: bool = True,
         expiry_time: int = 0,
-        port: int = None,
+        port: Union[int, None] = None,
         protocol: str = "vless"
     ):
         if expiry_time > 0:
@@ -145,8 +146,8 @@ class Client:
 
     def add_user_to_inbound(
         self,
-        inbound_id: int = None,
-        email: str = None,
+        inbound_id: Union[int, None] = None,
+        email: Union[str, None] = None,
         total_gb: int = 0,
         expiry_time: int = 0,
         enable: bool = True,

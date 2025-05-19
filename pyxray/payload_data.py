@@ -1,5 +1,6 @@
 from base64 import urlsafe_b64encode
 from secrets import token_bytes
+from typing import Union
 from uuid import uuid4
 from random import choice
 from string import ascii_lowercase, digits, hexdigits
@@ -8,7 +9,7 @@ from pytz import timezone
 
 
 def generate_client_settings(
-    email: str = None,
+    email: Union[str, None] = None,
     total_gb: int = 0,
     expiry_time: int = 0,
     enable: bool = True,
