@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional, List, Dict
+from typing import List, Dict
 
 
 class DB:

@@ -1,10 +1,7 @@
 from json import dumps
 from random import randint
-from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import Union
 
-from pytz import timezone
 from requests import Session
 
 from .db import DB
