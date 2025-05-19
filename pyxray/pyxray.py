@@ -131,7 +131,6 @@ class Client:
             "remark": name_inbound,
             "enable": enable,
             "expiryTime": expiry_time,
-            "clientStats": "null",
             "listen": "",
             "port": port,
             "protocol": protocol,
