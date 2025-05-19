@@ -1,31 +1,23 @@
-from base64 import urlsafe_b64encode
-from secrets import token_bytes
-from typing import Union
 from uuid import uuid4
-from random import choice
-from string import ascii_lowercase, digits, hexdigits
-from datetime import datetime, timedelta
-from pytz import timezone
+
+from .utils import (generate_short_ids, bytes_from_gb,
+                    random_string, generate_x25519_keys)
 
 
-def generate_client_settings(
-    email: Union[str, None] = None,
+def generate_settings(
+    email: str = None,
     total_gb: int = 0,
     expiry_time: int = 0,
     enable: bool = True,
     tg_id: str = ""
 ):
-    charset = ascii_lowercase + digits
+    keys = generate_x25519_keys()
+    short_ids = generate_short_ids()
+    total_gb_bytes = bytes_from_gb(total_gb)
+    sub_id = random_string(16)
+
     if email is None:
-        email = "".join(choice(charset) for _ in range(10))
-
-    if expiry_time > 0:
-        current_date = datetime.now(timezone("Europe/Moscow"))
-        future_time = current_date + timedelta(days=expiry_time)
-        expiry_time = int(future_time.timestamp() * 1000)
-
-    if total_gb > 0:
-        total_gb = (1024 ** 3) * total_gb
+        email = random_string(8)
 
     client_settings = {
         "clients": [
@@ -34,33 +26,17 @@ def generate_client_settings(
                 "flow": "xtls-rprx-vision",
                 "email": email,
                 "limitIp": 0,
-                "totalGB": total_gb,
+                "totalGB": total_gb_bytes,
                 "expiryTime": expiry_time,
                 "enable": enable,
                 "tgId": tg_id,
-                "subId": "".join(choice(charset) for _ in range(16)),
+                "subId": sub_id,
                 "reset": 0
             }
         ],
         "decryption": "none",
         "fallbacks": []
     }
-
-    return client_settings
-
-
-def generate_stream_settings():
-    private_key = urlsafe_b64encode(
-        token_bytes(32)).rstrip(b'=').decode('utf-8')
-    public_key = urlsafe_b64encode(
-        token_bytes(32)).rstrip(b'=').decode('utf-8')
-
-    short_ids_length = [8, 6, 16, 2, 10, 4, 14, 10]
-    hex_chars = hexdigits.lower()
-    hex_chars = hex_chars[:16]
-    short_ids = []
-    for i in short_ids_length:
-        short_ids.append(''.join(choice(hex_chars) for _ in range(i)))
 
     stream_settings = {
         "network": "tcp",
@@ -74,13 +50,13 @@ def generate_stream_settings():
                 "yahoo.com",
                 "www.yahoo.com"
             ],
-            "privateKey": private_key,
+            "privateKey": keys.get('privateKey'),
             "minClient": "",
             "maxClient": "",
             "maxTimediff": 0,
             "shortIds": short_ids,
             "settings": {
-                "publicKey": public_key,
+                "publicKey": keys.get('publicKey'),
                 "fingerprint": "firefox",
                 "serverName": "",
                 "spiderX": "/"
@@ -94,11 +70,7 @@ def generate_stream_settings():
         },
     }
 
-    return stream_settings
-
-
-def generate_sniffing():
-    return {
+    sniffing = {
         "enabled": True,
         "destOverride": [
             "http",
@@ -110,10 +82,10 @@ def generate_sniffing():
         "routeOnly": False
     }
 
-
-def generate_allocate():
-    return {
+    allocate = {
         "strategy": "always",
         "refresh": 5,
         "concurrency": 3
     }
+
+    return (client_settings, stream_settings, sniffing, allocate)

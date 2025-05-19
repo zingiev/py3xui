@@ -4,7 +4,7 @@ from typing import Optional, List, Dict
 
 class DB:
 
-    def __init__(self, db_name: str = 'pyxray.session'):
+    def __init__(self, db_name: str = 'pyxui.session'):
         self.connect = sqlite3.connect(db_name)
         self.connect.row_factory = sqlite3.Row  # Позволяет возвращать словари
         self.cursor = self.connect.cursor()

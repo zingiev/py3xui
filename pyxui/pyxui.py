@@ -7,19 +7,15 @@ from typing import Union
 from pytz import timezone
 from requests import Session
 
-from .payload_data import (
-    generate_allocate,
-    generate_client_settings,
-    generate_stream_settings,
-    generate_sniffing
-)
 from .db import DB
+from .payload_data import generate_settings
+from .utils import expiry_timestamp
 
 db = DB()
 
 
 class Client:
-    def __init__(self, host: str, port: int, web_base_path: str):
+    def __init__(self, host: str, port: str, web_base_path: str):
         self.host = host
         self.port = port
         self.web_base_path = web_base_path.strip("/")
@@ -85,7 +81,8 @@ class Client:
     def _request(self, method: str, path: str, **kwargs):
         url = self._build_url(path)
         headers = kwargs.pop("headers", {"Accept": "application/json"})
-        response = self.session.request(method, url, headers=headers, **kwargs)
+        response = self.session.request(
+            method, url, headers=headers, **kwargs)
 
         if response.status_code == HTTPStatus.OK:
             self._store_cookies()
@@ -107,23 +104,21 @@ class Client:
     def add_inbound(
         self,
         name_inbound: str = "New",
+        port: int = None,
         enable: bool = True,
         expiry_time: int = 0,
-        port: Union[int, None] = None,
-        protocol: str = "vless"
+
+        email: str = None,
+        total_gb: int = 0,
+        tg_id: str = ""
     ):
-        if expiry_time > 0:
-            current_date = datetime.now(timezone("Europe/Moscow"))
-            future_time = current_date + timedelta(days=expiry_time)
-            expiry_time = int(future_time.timestamp() * 1000)
+        expiry_time = expiry_timestamp(expiry_time)
+        port = randint(12345, 54321) if port is None else port
 
-        if port is None:
-            port = randint(12345, 54321)
-
-        client_settings = generate_client_settings()
-        stream_settings = generate_stream_settings()
-        sniffing = generate_sniffing()
-        allocate = generate_allocate()
+        client, stream, sniffing, allocate = generate_settings(
+            email=email, total_gb=total_gb, tg_id=tg_id,
+            expiry_time=expiry_time, enable=enable
+        )
 
         payload = {
             "up": 0,
@@ -134,38 +129,39 @@ class Client:
             "expiryTime": expiry_time,
             "listen": "",
             "port": port,
-            "protocol": protocol,
-            "settings": dumps(client_settings),
-            "streamSettings": dumps(stream_settings),
-            "tag": "inbound-55421",
+            "protocol": "vless",
+            "settings": dumps(client),
+            "streamSettings": dumps(stream),
             "sniffing": dumps(sniffing),
             "allocate": dumps(allocate)
         }
         path = f'{self.base_url}/add'
-        return self._request("POST", path, data=payload)
+        return self._request("POST", path, json=payload)
 
     def add_user_to_inbound(
         self,
-        inbound_id: Union[int, None] = None,
-        email: Union[str, None] = None,
+        inbound_id: int = None,
+        email: str = None,
         total_gb: int = 0,
         expiry_time: int = 0,
         enable: bool = True,
         tg_id: str = ""
     ):
+        expiry_time = expiry_timestamp(expiry_time)
+
         if inbound_id is None:
             result = self.inbounds()
             inbound_id = result["obj"][-1]["id"]
 
-        client_settings = generate_client_settings(
+        client, stream, sniffing, allocate = generate_settings(
             email=email, total_gb=total_gb, tg_id=tg_id,
             expiry_time=expiry_time, enable=enable)
-        client_settings.pop("decryption")
-        client_settings.pop("fallbacks")
+        client.pop("decryption")
+        client.pop("fallbacks")
 
         payload = {
             "id": inbound_id,
-            "settings": dumps(client_settings)
+            "settings": dumps(client)
         }
         path = f'{self.base_url}/addClient'
-        return self._request("POST", path, data=payload)
+        return self._request("POST", path, json=payload)
