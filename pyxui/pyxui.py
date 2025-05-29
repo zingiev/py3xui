@@ -12,11 +12,18 @@ db = DB()
 
 
 class Client:
-    def __init__(self, host: str, port: str, web_base_path: str):
+    def __init__(
+        self,
+        host: str,
+        port: str,
+        web_base_path: str,
+        ssl_certificate: bool = False
+    ):
         self.host = host
         self.port = port
-        self.web_base_path = web_base_path.strip("/")
+        self.web_base_path = web_base_path
         self.base_url = "panel/api/inbounds"
+        self.protocol = 'https' if ssl_certificate else 'http'
         self.session = Session()
 
         if db.exists_data(self.host):
@@ -40,7 +47,8 @@ class Client:
             raise Exception(response.reason, response.status_code)
 
     def _build_url(self, path: str):
-        return f"http://{self.host}:{self.port}/{self.web_base_path}/{path}"
+        return (f"{self.protocol}://{self.host}:"
+                f"{self.port}/{self.web_base_path}/{path}")
 
     def _store_cookies(self):
         if not self.session.cookies:
@@ -146,7 +154,7 @@ class Client:
     ):
         expiry_time = expiry_timestamp(expiry_time)
 
-        if inbound_id is None:
+        if not inbound_id:
             result = self.inbounds()
             inbound_id = result["obj"][-1]["id"]
 
