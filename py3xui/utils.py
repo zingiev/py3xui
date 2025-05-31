@@ -12,7 +12,7 @@ def bytes_from_gb(gb: int) -> int:
     return gb * 1024 ** 3 if gb > 0 else 0
 
 
-def random_string(length=8):
+def random_string(length=8) -> str:
     charset = ascii_lowercase + digits
     return ''.join(choice(charset) for _ in range(length))
 

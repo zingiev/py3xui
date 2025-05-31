@@ -1,12 +1,11 @@
-from json import dumps
-from random import randint
+from json import dumps, loads
 from http import HTTPStatus
 
 from requests import Session
 
 from .db import DB
-from .payload_data import generate_settings
-from .utils import expiry_timestamp
+from .payload import generate_payload
+from .utils import expiry_timestamp, bytes_from_gb
 
 db = DB()
 
@@ -98,7 +97,7 @@ class Client:
         path = f"{self.base_url}/list"
         return self._request("GET", path)
 
-    def inbound(self, inbound_id: str):
+    def inbound(self, inbound_id: int):
         path = f"{self.base_url}/get/{inbound_id}"
         return self._request("GET", path)
 
@@ -109,44 +108,29 @@ class Client:
     def add_inbound(
         self,
         name_inbound: str = "New",
-        port: int = None,
+        port: int | None = None,
         enable: bool = True,
         expiry_time: int = 0,
-
-        email: str = None,
+        email: str | None = None,
         total_gb: int = 0,
         tg_id: str = ""
     ):
-        expiry_time = expiry_timestamp(expiry_time)
-        port = randint(12345, 54321) if port is None else port
-
-        client, stream, sniffing, allocate = generate_settings(
-            email=email, total_gb=total_gb, tg_id=tg_id,
-            expiry_time=expiry_time, enable=enable
+        payload, _ = generate_payload(
+            name_inbound=name_inbound,
+            port=port,
+            enable=enable,
+            expiry_time=expiry_time,
+            email=email,
+            total_gb=total_gb,
+            tg_id=tg_id
         )
-
-        payload = {
-            "up": 0,
-            "down": 0,
-            "total": 0,
-            "remark": name_inbound,
-            "enable": enable,
-            "expiryTime": expiry_time,
-            "listen": "",
-            "port": port,
-            "protocol": "vless",
-            "settings": dumps(client),
-            "streamSettings": dumps(stream),
-            "sniffing": dumps(sniffing),
-            "allocate": dumps(allocate)
-        }
         path = f'{self.base_url}/add'
         return self._request("POST", path, json=payload)
 
-    def add_user_to_inbound(
+    def add_client_to_inbound(
         self,
-        inbound_id: int = None,
-        email: str = None,
+        inbound_id: int | None = None,
+        email: str | None = None,
         total_gb: int = 0,
         expiry_time: int = 0,
         enable: bool = True,
@@ -158,9 +142,13 @@ class Client:
             result = self.inbounds()
             inbound_id = result["obj"][-1]["id"]
 
-        client, stream, sniffing, allocate = generate_settings(
-            email=email, total_gb=total_gb, tg_id=tg_id,
-            expiry_time=expiry_time, enable=enable)
+        _, client = generate_payload(
+            email=email,
+            total_gb=total_gb,
+            expiry_time=expiry_time,
+            enable=enable,
+            tg_id=tg_id
+        )
         client.pop("decryption")
         client.pop("fallbacks")
 
@@ -169,4 +157,42 @@ class Client:
             "settings": dumps(client)
         }
         path = f'{self.base_url}/addClient'
+        return self._request("POST", path, json=payload)
+
+    def _get_client_uuid_by_email(self, email: str):
+        inbounds = self.inbounds().get('obj')
+        for inbound in inbounds:
+            if inbound.get('protocol') != 'vless':
+                continue
+            clients = loads(inbound.get('settings')).get('clients')
+            for client in clients:
+                if client.get('email') == email:
+                    return inbound.get('id'), client
+        return None
+
+    def update_client(
+        self,
+        email: str,
+        total_gb: int = 0,
+        expiry_time: int = 0,
+        enable: bool = True,
+        tg_id: str = ""
+    ):
+        inbound_id, client = self._get_client_uuid_by_email(
+            email
+        )  # type: ignore
+        if not client:
+            return 'Client not found'
+
+        uuid = client['id']
+        client['totalGB'] = bytes_from_gb(total_gb)
+        client['expiryTime'] = expiry_timestamp(expiry_time)
+        client['enable'] = enable
+        client['tgId'] = tg_id
+
+        payload = {
+            "id": inbound_id,
+            "settings": dumps({"clients": [client]})
+        }
+        path = f'{self.base_url}/updateClient/{uuid}'
         return self._request("POST", path, json=payload)
