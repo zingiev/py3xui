@@ -21,7 +21,7 @@ class Client:
         self.host = host
         self.port = port
         self.web_base_path = web_base_path
-        self.base_url = "panel/api/inbounds"
+        self.base_url = 'panel/api/inbounds'
         self.protocol = 'https' if ssl_certificate else 'http'
         self.session = Session()
 
@@ -31,13 +31,13 @@ class Client:
             self._prompt_login()
 
     def _prompt_login(self):
-        username = input("Username: ")
-        password = input("Password: ")
+        username = input('Username: ')
+        password = input('Password: ')
         self._login_and_store_cookies(username, password)
 
     def _login_and_store_cookies(self, username: str, password: str):
-        url = self._build_url("login")
-        payload = {"username": username, "password": password}
+        url = self._build_url('login')
+        payload = {'username': username, 'password': password}
         response = self.session.post(url, data=payload)
 
         if response.status_code == HTTPStatus.OK:
@@ -46,21 +46,21 @@ class Client:
             raise Exception(response.reason, response.status_code)
 
     def _build_url(self, path: str):
-        return (f"{self.protocol}://{self.host}:"
-                f"{self.port}/{self.web_base_path}/{path}")
+        return (f'{self.protocol}://{self.host}:'
+                f'{self.port}/{self.web_base_path}/{path}')
 
     def _store_cookies(self):
         if not self.session.cookies:
             raise Exception(
-                "No cookies found. Possibly incorrect credentials.")
+                'No cookies found. Possibly incorrect credentials.')
 
         for cookie in self.session.cookies:
             cookie_data = {
-                "name": cookie.name,
-                "value": cookie.value,
-                "domain": cookie.domain,
-                "path": cookie.path,
-                "secure": str(cookie.secure)
+                'name': cookie.name,
+                'value': cookie.value,
+                'domain': cookie.domain,
+                'path': cookie.path,
+                'secure': str(cookie.secure)
             }
 
             if db.exists_cookie(cookie.domain, cookie.name):
@@ -72,19 +72,19 @@ class Client:
         cookies = db.get_cookies_by_domain(self.host)
         if not cookies:
             raise Exception(
-                "No cookies found in database. Please login again.")
+                'No cookies found in database. Please login again.')
 
         for c in cookies:
             self.session.cookies.set(
-                name=c["name"],
-                value=c["value"],
-                domain=c["domain"],
-                path=c["path"]
+                name=c['name'],
+                value=c['value'],
+                domain=c['domain'],
+                path=c['path']
             )
 
     def _request(self, method: str, path: str, **kwargs):
         url = self._build_url(path)
-        headers = kwargs.pop("headers", {"Accept": "application/json"})
+        headers = kwargs.pop('headers', {'Accept': 'application/json'})
         response = self.session.request(
             method, url, headers=headers, **kwargs)
 
@@ -92,72 +92,6 @@ class Client:
             self._store_cookies()
             return response.json()
         raise Exception(response.reason, response.status_code)
-
-    def inbounds(self):
-        path = f"{self.base_url}/list"
-        return self._request("GET", path)
-
-    def inbound(self, inbound_id: int):
-        path = f"{self.base_url}/get/{inbound_id}"
-        return self._request("GET", path)
-
-    def get_traffics_with_email(self, email: str):
-        path = f"{self.base_url}/getClientTraffics/{email}"
-        return self._request("GET", path)
-
-    def add_inbound(
-        self,
-        name_inbound: str = "New",
-        port: int | None = None,
-        enable: bool = True,
-        expiry_time: int = 0,
-        email: str | None = None,
-        total_gb: int = 0,
-        tg_id: str = ""
-    ):
-        payload, _ = generate_payload(
-            name_inbound=name_inbound,
-            port=port,
-            enable=enable,
-            expiry_time=expiry_time,
-            email=email,
-            total_gb=total_gb,
-            tg_id=tg_id
-        )
-        path = f'{self.base_url}/add'
-        return self._request("POST", path, json=payload)
-
-    def add_client_to_inbound(
-        self,
-        inbound_id: int | None = None,
-        email: str | None = None,
-        total_gb: int = 0,
-        expiry_time: int = 0,
-        enable: bool = True,
-        tg_id: str = ""
-    ):
-        expiry_time = expiry_timestamp(expiry_time)
-
-        if not inbound_id:
-            result = self.inbounds()
-            inbound_id = result["obj"][-1]["id"]
-
-        _, client = generate_payload(
-            email=email,
-            total_gb=total_gb,
-            expiry_time=expiry_time,
-            enable=enable,
-            tg_id=tg_id
-        )
-        client.pop("decryption")
-        client.pop("fallbacks")
-
-        payload = {
-            "id": inbound_id,
-            "settings": dumps(client)
-        }
-        path = f'{self.base_url}/addClient'
-        return self._request("POST", path, json=payload)
 
     def _get_client_uuid_by_email(self, email: str):
         inbounds = self.inbounds().get('obj')
@@ -170,13 +104,79 @@ class Client:
                     return inbound.get('id'), client
         return None
 
-    def update_client(
+    def inbounds(self):
+        path = f'{self.base_url}/list'
+        return self._request('GET', path)
+
+    def inbound(self, inbound_id: int):
+        path = f'{self.base_url}/get/{inbound_id}'
+        return self._request('GET', path)
+
+    def get_traffics_with_email(self, email: str):
+        path = f'{self.base_url}/getClientTraffics/{email}'
+        return self._request('GET', path)
+
+    def add_inbound(
         self,
-        email: str,
+        name_inbound: str = 'New',
+        port: int | None = None,
+        enable: bool = True,
+        expiry_time: int = 0,
+        email: str | None = None,
+        total_gb: int = 0,
+        tg_id: str = ''
+    ):
+        payload, _ = generate_payload(
+            name_inbound=name_inbound,
+            port=port,
+            enable=enable,
+            expiry_time=expiry_time,
+            email=email,
+            total_gb=total_gb,
+            tg_id=tg_id
+        )
+        path = f'{self.base_url}/add'
+        return self._request('POST', path, json=payload)
+
+    def add_client_to_inbound(
+        self,
+        inbound_id: int | None = None,
+        email: str | None = None,
         total_gb: int = 0,
         expiry_time: int = 0,
         enable: bool = True,
-        tg_id: str = ""
+        tg_id: str = ''
+    ):
+        expiry_time = expiry_timestamp(expiry_time)
+
+        if not inbound_id:
+            result = self.inbounds()
+            inbound_id = result['obj'][-1]['id']
+
+        _, client = generate_payload(
+            email=email,
+            total_gb=total_gb,
+            expiry_time=expiry_time,
+            enable=enable,
+            tg_id=tg_id
+        )
+        client.pop('decryption')
+        client.pop('fallbacks')
+
+        payload = {
+            'id': inbound_id,
+            'settings': dumps(client)
+        }
+        path = f'{self.base_url}/addClient'
+        return self._request('POST', path, json=payload)
+
+    def update_client(
+        self,
+        email: str,
+        enable=None,
+        tg_id=None,
+        total_gb=None,
+        expiry_time=None,
     ):
         inbound_id, client = self._get_client_uuid_by_email(
             email
@@ -184,15 +184,51 @@ class Client:
         if not client:
             return 'Client not found'
 
-        uuid = client['id']
-        client['totalGB'] = bytes_from_gb(total_gb)
-        client['expiryTime'] = expiry_timestamp(expiry_time)
-        client['enable'] = enable
-        client['tgId'] = tg_id
+        uuid = client.get('id')
+        if total_gb is not None:
+            client['totalGB'] = bytes_from_gb(total_gb)
+        if expiry_time is not None:
+            client['expiryTime'] = expiry_timestamp(expiry_time)
+        if enable is not None:
+            client['enable'] = enable
+        if tg_id is not None:
+            client['tgId'] = tg_id
 
         payload = {
-            "id": inbound_id,
-            "settings": dumps({"clients": [client]})
+            'id': inbound_id,
+            'settings': dumps({'clients': [client]})
         }
         path = f'{self.base_url}/updateClient/{uuid}'
-        return self._request("POST", path, json=payload)
+        return self._request('POST', path, json=payload)
+
+    def reset_all_traffics(self):
+        url = f'{self.base_url}/resetAllTraffics'
+        return self._request('POST', url)
+
+    def reset_client_traffic(self, email: str):
+        inbound_id, client = self._get_client_uuid_by_email(
+            email
+        )  # type: ignore
+        if not client:
+            return 'Client not found'
+        email = client.get('email')
+        url = f'{self.base_url}/{inbound_id}/resetClientTraffic/{email}'
+        return self._request('POST', url)
+
+    def delete_client(self, email: str):
+        inbound_id, client = self._get_client_uuid_by_email(
+            email
+        )  # type: ignore
+        if not client:
+            return 'Client not found'
+        uuid = client.get('id')
+        url = f'{self.base_url}/{inbound_id}/delClient/{uuid}'
+        return self._request('POST', url)
+
+    def delete_inbound(self, inbound_id: int):
+        url = f'{self.base_url}/del/{inbound_id}'
+        return self._request('POST', url)
+
+    def get_online_clients(self):
+        url = f'{self.base_url}/onlines'
+        return self._request('POST', url).get('obj')
