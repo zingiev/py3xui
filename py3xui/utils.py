@@ -34,7 +34,6 @@ def expiry_timestamp(days: int) -> int:
 def generate_x25519_keys() -> dict[str, str]:
     private_key = x25519.X25519PrivateKey.generate()
     public_key = private_key.public_key()
-
     private_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PrivateFormat.Raw,
@@ -44,8 +43,6 @@ def generate_x25519_keys() -> dict[str, str]:
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw
     )
-
     private_key_b64 = urlsafe_b64encode(private_bytes).decode().rstrip("=")
     public_key_b64 = urlsafe_b64encode(public_bytes).decode().rstrip("=")
-
     return {"privateKey": private_key_b64, "publicKey": public_key_b64}
