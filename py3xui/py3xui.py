@@ -3,11 +3,9 @@ from http import HTTPStatus
 
 from requests import Session
 
-from .db import DB
+from .db import db, Cookies
 from .payload import generate_payload
 from .utils import expiry_timestamp, bytes_from_gb
-
-db = DB()
 
 
 class Client:
@@ -25,10 +23,27 @@ class Client:
         self.protocol = 'https' if ssl_certificate else 'http'
         self.session = Session()
 
-        if db.exists_data(self.host):
+        if db.query(Cookies).filter_by(domain=self.host).first():
             self._load_cookies_from_db()
         else:
             self._prompt_login()
+
+    def _build_url(self, path: str):
+        return (f'{self.protocol}://{self.host}:'
+                f'{self.port}/{self.web_base_path}/{path}')
+
+    def _load_cookies_from_db(self):
+        cookies = db.query(Cookies).filter_by(domain=self.host).first()
+        if not cookies:
+            raise Exception(
+                'No cookies found in database. Please login again.')
+
+        self.session.cookies.set(
+            name=cookies.name,
+            value=cookies.value,
+            domain=cookies.domain,
+            path=cookies.path
+        )
 
     def _prompt_login(self):
         username = input('Username: ')
@@ -39,48 +54,32 @@ class Client:
         url = self._build_url('login')
         payload = {'username': username, 'password': password}
         response = self.session.post(url, data=payload)
-
         if response.status_code == HTTPStatus.OK:
-            self._store_cookies()
-        else:
-            raise Exception(response.reason, response.status_code)
-
-    def _build_url(self, path: str):
-        return (f'{self.protocol}://{self.host}:'
-                f'{self.port}/{self.web_base_path}/{path}')
+            return self._store_cookies()
+        raise Exception(response.reason, response.status_code)
 
     def _store_cookies(self):
         if not self.session.cookies:
             raise Exception(
                 'No cookies found. Possibly incorrect credentials.')
-
-        for cookie in self.session.cookies:
-            cookie_data = {
-                'name': cookie.name,
-                'value': cookie.value,
-                'domain': cookie.domain,
-                'path': cookie.path,
-                'secure': str(cookie.secure)
-            }
-
-            if db.exists_cookie(cookie.domain, cookie.name):
-                db.update_data(**cookie_data)
-            else:
-                db.insert_data(**cookie_data)
-
-    def _load_cookies_from_db(self):
-        cookies = db.get_cookies_by_domain(self.host)
-        if not cookies:
-            raise Exception(
-                'No cookies found in database. Please login again.')
-
-        for c in cookies:
-            self.session.cookies.set(
-                name=c['name'],
-                value=c['value'],
-                domain=c['domain'],
-                path=c['path']
-            )
+        cookie = [cookie for cookie in self.session.cookies][0]
+        cookie_from_db = db.query(Cookies).filter_by(
+            domain=cookie.domain).first()
+        if cookie_from_db:
+            cookie_from_db.name = cookie.name
+            cookie_from_db.value = cookie.value
+            cookie_from_db.domain = cookie.domain
+            cookie_from_db.path = cookie.path
+            cookie_from_db.secure = cookie.secure
+        else:
+            db.add(Cookies(
+                name=cookie.name,
+                value=cookie.value,
+                domain=cookie.domain,
+                path=cookie.path,
+                secure=cookie.secure
+            ))
+        db.commit()
 
     def _request(self, method: str, path: str, **kwargs):
         url = self._build_url(path)
@@ -180,7 +179,7 @@ class Client:
     ):
         inbound_id, client = self._get_client_uuid_by_email(
             email
-        )  # type: ignore
+        )
         if not client:
             return 'Client not found'
 
@@ -208,7 +207,7 @@ class Client:
     def reset_client_traffic(self, email: str):
         inbound_id, client = self._get_client_uuid_by_email(
             email
-        )  # type: ignore
+        )
         if not client:
             return 'Client not found'
         email = client.get('email')
@@ -218,7 +217,7 @@ class Client:
     def delete_client(self, email: str):
         inbound_id, client = self._get_client_uuid_by_email(
             email
-        )  # type: ignore
+        )
         if not client:
             return 'Client not found'
         uuid = client.get('id')
