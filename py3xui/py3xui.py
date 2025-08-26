@@ -177,9 +177,7 @@ class Client:
         total_gb=None,
         expiry_time=None,
     ):
-        inbound_id, client = self._get_client_uuid_by_email(
-            email
-        )
+        inbound_id, client = self._get_client_uuid_by_email(email)
         if not client:
             return 'Client not found'
 
@@ -205,9 +203,7 @@ class Client:
         return self._request('POST', url)
 
     def reset_client_traffic(self, email: str):
-        inbound_id, client = self._get_client_uuid_by_email(
-            email
-        )
+        inbound_id, client = self._get_client_uuid_by_email(email)
         if not client:
             return 'Client not found'
         email = client.get('email')
@@ -215,9 +211,7 @@ class Client:
         return self._request('POST', url)
 
     def delete_client(self, email: str):
-        inbound_id, client = self._get_client_uuid_by_email(
-            email
-        )
+        inbound_id, client = self._get_client_uuid_by_email(email)
         if not client:
             return 'Client not found'
         uuid = client.get('id')
